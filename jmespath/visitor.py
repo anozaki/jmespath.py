@@ -4,6 +4,21 @@ from jmespath import functions
 from jmespath.compat import string_type
 from numbers import Number
 
+LIST_FILTER = (list, tuple)
+
+
+def add_list_filter(list_type):
+    """
+    Add additional list type jmespath will treat as list type. By default, list and tuple type
+    are treated as a list.
+
+    You can for example specify numpy array to be treated as a list
+
+    @param list_type: type to additionally be treated as list
+    """
+    global LIST_FILTER
+    LIST_FILTER = LIST_FILTER + (list_type,)
+
 
 def _equals(x, y):
     if _is_special_integer_case(x, y):
@@ -172,7 +187,7 @@ class TreeInterpreter(Visitor):
 
     def visit_filter_projection(self, node, value):
         base = self.visit(node['children'][0], value)
-        if not isinstance(base, list):
+        if not isinstance(base, LIST_FILTER):
             return None
         comparator_node = node['children'][2]
         collected = []
@@ -185,12 +200,12 @@ class TreeInterpreter(Visitor):
 
     def visit_flatten(self, node, value):
         base = self.visit(node['children'][0], value)
-        if not isinstance(base, list):
+        if not isinstance(base, LIST_FILTER):
             # Can't flatten the object if it's not a list.
             return None
         merged_list = []
         for element in base:
-            if isinstance(element, list):
+            if isinstance(element, LIST_FILTER):
                 merged_list.extend(element)
             else:
                 merged_list.append(element)
@@ -202,7 +217,7 @@ class TreeInterpreter(Visitor):
     def visit_index(self, node, value):
         # Even though we can index strings, we don't
         # want to support that.
-        if not isinstance(value, list):
+        if not isinstance(value, (list, tuple, np.ndarray)):
             return None
         try:
             return value[node['value']]
@@ -216,7 +231,7 @@ class TreeInterpreter(Visitor):
         return result
 
     def visit_slice(self, node, value):
-        if not isinstance(value, list):
+        if not isinstance(value, LIST_FILTER):
             return None
         s = slice(*node['children'])
         return value[s]
@@ -271,7 +286,7 @@ class TreeInterpreter(Visitor):
 
     def visit_projection(self, node, value):
         base = self.visit(node['children'][0], value)
-        if not isinstance(base, list):
+        if not isinstance(base, LIST_FILTER):
             return None
         collected = []
         for element in base:
